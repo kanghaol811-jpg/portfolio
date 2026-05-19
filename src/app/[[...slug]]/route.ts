@@ -20,12 +20,42 @@ const SLUG_MAP: Record<string, string> = {
   archive: "archive",
 };
 
+const MIME_MAP: Record<string, string> = {
+  glb: "model/gltf-binary",
+  webp: "image/webp",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  svg: "image/svg+xml",
+  woff2: "font/woff2",
+  json: "application/json",
+  mp4: "video/mp4",
+};
+
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ slug?: string[] }> }
 ) {
   const { slug: slugArray } = await params;
   const slug = slugArray || [];
+
+  // Serve static files from public/ before catch-all route logic
+  if (slug.length > 2) {
+    const filePath = path.join(process.cwd(), "public", ...slug);
+    try {
+      const stat = fs.statSync(filePath);
+      if (stat.isFile()) {
+        const ext = path.extname(filePath).slice(1).toLowerCase();
+        const contentType = MIME_MAP[ext] || "application/octet-stream";
+        const content = fs.readFileSync(filePath);
+        return new NextResponse(content, {
+          headers: { "Content-Type": contentType, "Cache-Control": "public, max-age=31536000, immutable" },
+        });
+      }
+    } catch {
+      // fall through to page routing
+    }
+  }
 
   let key: string;
   if (slug.length === 0) {
